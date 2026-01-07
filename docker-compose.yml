@@ -1,0 +1,33 @@
+services:
+  agent:
+    build: .
+    container_name: ai-agent-api
+    ports:
+      - "8000:8000"
+    environment:
+      # Python path for imports
+      - PYTHONPATH=/app
+      # Ollama connection (adjust if your Ollama is elsewhere)
+      - OLLAMA_HOST=http://host.docker.internal:11434
+      - OLLAMA_MODEL=llama3.2:3b
+      # Environment
+      - ENVIRONMENT=development
+      - DEBUG=true
+    volumes:
+      # Mount entire project
+      - .:/app
+      # Persist database
+      - ./data:/app/data
+      # Google Calendar credentials (if you have them)
+      - ./credentials:/app/credentials
+    restart: unless-stopped
+    # Run FastAPI server
+    command: python -m uvicorn FastApi.main:app --host 0.0.0.0 --port 8000 --reload
+    
+    # Health check (optional but recommended)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

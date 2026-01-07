@@ -1,0 +1,189 @@
+"""
+Prompt Management CLI - Tool for managing prompt templates
+Allows listing, viewing, updating, and testing prompts
+"""
+from promt.Promt_library import get_prompt_library
+from promt.Prompt_template import PromptType
+import sys
+
+
+def list_prompts(prompt_type: str = None):
+    """List all prompts or filter by type"""
+    library = get_prompt_library()
+    
+    prompts = library.list_prompts(prompt_type)
+    
+    print(f"\n{'=' * 80}")
+    if prompt_type:
+        print(f"PROMPTS - Type: {prompt_type}")
+    else:
+        print(f"ALL PROMPTS ({len(prompts)} total)")
+    print('=' * 80)
+    
+    if not prompts:
+        print("No prompts found.")
+        return
+    
+    # Group by type
+    by_type = {}
+    for p in prompts:
+        t = p['type']
+        if t not in by_type:
+            by_type[t] = []
+        by_type[t].append(p)
+    
+    for ptype, items in by_type.items():
+        print(f"\n{ptype.upper()} ({len(items)}):")
+        print("─" * 80)
+        for p in items:
+            print(f"  • {p['name']} (v{p['version']})")
+            print(f"    {p['description']}")
+            if p['example_count'] > 0:
+                print(f"    Examples: {p['example_count']}")
+            print()
+
+
+def view_prompt(name: str):
+    """View a specific prompt template"""
+    library = get_prompt_library()
+    prompt = library.get(name)
+    
+    if not prompt:
+        print(f"❌ Prompt '{name}' not found")
+        return
+    
+    print(f"\n{'=' * 80}")
+    print(f"PROMPT: {prompt.name}")
+    print('=' * 80)
+    print(f"Type: {prompt.prompt_type.value}")
+    print(f"Version: {prompt.version}")
+    print(f"Description: {prompt.description}")
+    
+    print(f"\n{'─' * 80}")
+    print("TEMPLATE:")
+    print('─' * 80)
+    print(prompt.template)
+    
+    if prompt.examples:
+        print(f"\n{'─' * 80}")
+        print("EXAMPLES:")
+        print('─' * 80)
+        for i, ex in enumerate(prompt.examples, 1):
+            print(f"\nExample {i}:")
+            for k, v in ex.items():
+                print(f"  {k}: {v}")
+
+
+def test_prompt(name: str):
+    """Test rendering a prompt with sample data"""
+    library = get_prompt_library()
+    prompt = library.get(name)
+    
+    if not prompt:
+        print(f"❌ Prompt '{name}' not found")
+        return
+    
+    print(f"\n{'=' * 80}")
+    print(f"TEST PROMPT: {prompt.name}")
+    print('=' * 80)
+    
+    # Get sample values
+    print("\nEnter values for template variables:")
+    print("(Press Enter to skip optional variables)\n")
+    
+    # Extract variables from template
+    import re
+    variables = re.findall(r'\{(\w+)\}', prompt.template)
+    variables = list(set(variables))  # Remove duplicates
+    
+    values = {}
+    for var in variables:
+        value = input(f"  {var}: ").strip()
+        if value:
+            values[var] = value
+        else:
+            values[var] = f"[{var}]"  # Placeholder
+    
+    # Render
+    print(f"\n{'─' * 80}")
+    print("RENDERED PROMPT:")
+    print('─' * 80)
+    try:
+        rendered = prompt.render(**values)
+        print(rendered)
+    except Exception as e:
+        print(f"❌ Error rendering: {e}")
+
+
+def prompt_stats():
+    """Show statistics about prompt library"""
+    library = get_prompt_library()
+    
+    all_prompts = library.list_prompts()
+    
+    # Count by type
+    type_counts = {}
+    for p in all_prompts:
+        t = p['type']
+        type_counts[t] = type_counts.get(t, 0) + 1
+    
+    print(f"\n{'=' * 80}")
+    print("PROMPT LIBRARY STATISTICS")
+    print('=' * 80)
+    print(f"\nTotal prompts: {len(all_prompts)}")
+    print(f"\nBy type:")
+    for ptype, count in sorted(type_counts.items()):
+        print(f"  • {ptype}: {count}")
+    
+    print(f"\nPrompt types available:")
+    for pt in PromptType:
+        print(f"  • {pt.value}")
+
+
+def main():
+    """Main CLI interface"""
+    if len(sys.argv) < 2:
+        print("\nPrompt Management CLI")
+        print("=" * 80)
+        print("\nUsage:")
+        print("  python prompt_manager.py list [type]       - List all prompts")
+        print("  python prompt_manager.py view <name>       - View specific prompt")
+        print("  python prompt_manager.py test <name>       - Test rendering a prompt")
+        print("  python prompt_manager.py stats             - Show statistics")
+        print("\nExamples:")
+        print("  python prompt_manager.py list reasoning")
+        print("  python prompt_manager.py view react_thought")
+        print("  python prompt_manager.py test tool_decision")
+        print()
+        return
+    
+    command = sys.argv[1].lower()
+    
+    if command == "list":
+        prompt_type = sys.argv[2] if len(sys.argv) > 2 else None
+        list_prompts(prompt_type)
+    
+    elif command == "view":
+        if len(sys.argv) < 3:
+            print("❌ Please specify prompt name")
+            print("Usage: python prompt_manager.py view <name>")
+            return
+        view_prompt(sys.argv[2])
+    
+    elif command == "test":
+        if len(sys.argv) < 3:
+            print("❌ Please specify prompt name")
+            print("Usage: python prompt_manager.py test <name>")
+            return
+        test_prompt(sys.argv[2])
+    
+    elif command == "stats":
+        prompt_stats()
+    
+    else:
+        print(f"❌ Unknown command: {command}")
+        print("Use: list, view, test, or stats")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,17 +1,10 @@
-"""
-Agent Manager Service
-Singleton service to manage agent instances and components
-Adapted for your project structure
-"""
 from typing import Optional
 import logging
 import sys
 import os
 
-# Add parent directory to path so we can import from root
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
-
-from models.ollama import OllamaModel
+# New Import: Replace Ollama with HuggingFace
+from models.huggingface import HuggingFaceModel
 from infra.tool_registry import ToolRegistry
 from memory import ConversationStore
 from memory.context_manager import ContextManager
@@ -19,11 +12,7 @@ from memory.preference_engine import PreferenceEngine
 
 logger = logging.getLogger(__name__)
 
-
 class AgentManager:
-    """
-    Singleton service to manage all agents and shared resources
-    """
     _instance = None
     
     def __new__(cls):
@@ -36,7 +25,23 @@ class AgentManager:
         if self._initialized:
             return
         
-        logger.info("Initializing Agent Manager...")
+        logger.info("Initializing Agent Manager with Hugging Face...")
+        
+        # Pull model ID from .env, default to a Kaggle-friendly model
+        model_id = os.getenv("HF_MODEL_ID", "Ali-jammoul/fake-news-detector-3b")
+        
+        # Initialize Core Components
+        self.model = HuggingFaceModel(model_id=model_id)
+        self.registry = ToolRegistry()
+        
+        # Memory & Sessions
+        self.memory_store = ConversationStore()
+        self.context_manager = ContextManager(self.memory_store)
+        self.preference_engine = PreferenceEngine(self.memory_store)
+        self.sessions = {}
+        
+        self._initialized = True
+        logger.info(f"Agent Manager initialized with {model_id}")
         
         # Initialize core components
         self.model = OllamaModel()

@@ -20,62 +20,36 @@ class AgentManager:
             cls._instance = super().__new__(cls)
             cls._instance._initialized = False
         return cls._instance
-    
+     
     def __init__(self):
         if self._initialized:
             return
         
-        logger.info("Initializing Agent Manager with Hugging Face...")
-        
-        # Pull model ID from .env, default to a Kaggle-friendly model
-        model_id = os.getenv("HF_MODEL_ID", "Ali-jammoul/fake-news-detector-3b")
-        
-        # Initialize Core Components
-        self.model = HuggingFaceModel(model_id=model_id)
+        logger.info("Initializing Agent Manager...")
+        self.model = None  # Don't load the model here!
         self.registry = ToolRegistry()
-        
-        # Memory & Sessions
         self.memory_store = ConversationStore()
         self.context_manager = ContextManager(self.memory_store)
         self.preference_engine = PreferenceEngine(self.memory_store)
         self.sessions = {}
-        
         self._initialized = True
-        logger.info(f"Agent Manager initialized with {model_id}")
-        
-        # Initialize core components
-        self.model = OllamaModel()
-        self.registry = ToolRegistry()
-        
-        # Memory components
-        self.memory_store = ConversationStore()
-        self.context_manager = ContextManager(self.memory_store)
-        self.preference_engine = PreferenceEngine(self.memory_store)
-        
-        # Session storage
-        self.sessions = {}
-        
-        self._initialized = True
-        logger.info("Agent Manager initialized successfully")
-    
+
+    def get_model(self):
+        """Lazy load the model only when an agent is actually requested."""
+        if self.model is None:
+            from models.huggingface import HuggingFaceModel
+            model_id = os.getenv("HF_MODEL_ID", "Ali-jammoul/fake-news-detector-3b")
+            logger.info(f"Loading Hugging Face model: {model_id}")
+            self.model = HuggingFaceModel(model_id=model_id)
+        return self.model
+
     def get_agent(self, agent_type: str, session_id: Optional[str] = None):
-        """
-        Get or create agent instance
+        # Pass self.get_model() instead of self.model
+        current_model = self.get_model()
         
-        Args:
-            agent_type: Type of agent (react, cot, tot, scheduler)
-            session_id: Optional session ID
-            
-        Returns:
-            Agent instance
-            
-        Raises:
-            ValueError: If agent_type is unknown
-        """
         if agent_type == "react":
             from agents.react_agent import ReActAgent
-            return ReActAgent(self.model, self.registry, max_steps=5)
-        
+            return ReActAgent(current_model, self.registry, max_steps=5)
         elif agent_type == "cot":
             from agents.cot_agent import CoTAgent
             return CoTAgent(self.model, self.registry, num_thoughts=3)

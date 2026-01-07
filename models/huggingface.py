@@ -5,7 +5,7 @@ from models.base import BaseModel
 class HuggingFaceModel(BaseModel):
     def __init__(self, model_id: str):
         self._model_id = model_id
-        
+        self.tokenizer = AutoTokenizer.from_pretrained(model_id, use_fast=False)
         # Load the specialized classification model
         self.tokenizer = AutoTokenizer.from_pretrained(model_id)
         self.model = AutoModelForSequenceClassification.from_pretrained(

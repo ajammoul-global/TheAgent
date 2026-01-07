@@ -1,50 +1,53 @@
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline
 from models.base import BaseModel
 
 class HuggingFaceModel(BaseModel):
     def __init__(self, model_id: str):
-        self.model_id = model_id
+        self._model_id = model_id
         
-        # 4-bit configuration for Kaggle memory safety
-        quant_config = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_compute_dtype=torch.float16,
-            bnb_4bit_quant_type="nf4"
-        )
-        
+        # Load the specialized classification model
         self.tokenizer = AutoTokenizer.from_pretrained(model_id)
-        self.model = AutoModelForCausalLM.from_pretrained(
+        self.model = AutoModelForSequenceClassification.from_pretrained(
             model_id,
-            quantization_config=quant_config,
             device_map="auto",
+            torch_dtype=torch.float16,
             trust_remote_code=True
         )
+        
+        # Initialize a pipeline for easy inference
+        self.classifier = pipeline(
+            "text-classification", 
+            model=self.model, 
+            tokenizer=self.tokenizer
+        )
 
-    # --- ADD THESE MISSING METHODS ---
+    # --- REQUIRED ABSTRACT METHODS ---
     @property
     def name(self) -> str:
-        return self.model_id
+        """Returns the name of the model."""
+        return self._model_id
 
     @property
     def provider(self) -> str:
+        """Identifies the model provider."""
         return "huggingface"
 
     def get_info(self) -> dict:
+        """Returns metadata about the model for the system logs."""
         return {
-            "model_id": self.model_id,
-            "type": "causal_lm",
-            "device": str(self.model.device)
+            "model_id": self._model_id,
+            "device": str(self.model.device),
+            "task": "text-classification"
         }
-    # ---------------------------------
+    # ----------------------------------
 
     def generate(self, prompt: str) -> str:
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
-        outputs = self.model.generate(
-            **inputs, 
-            max_new_tokens=512, 
-            temperature=0.7, 
-            do_sample=True
-        )
-        full_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-        return full_text[len(prompt):].strip()
+        """
+        Since this is a classifier, 'generate' will return the 
+        prediction label (FAKE/REAL) instead of generating new text.
+        """
+        results = self.classifier(prompt, truncation=True, max_length=512)
+        label = results[0]['label']
+        score = results[0]['score']
+        return f"Analysis: {label} (Confidence: {score:.2f})"

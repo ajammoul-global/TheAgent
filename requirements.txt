@@ -26,7 +26,7 @@ tenacity==8.2.3
 
 # Environment variables
 python-dotenv==1.0.0
-import dateparser
+dateparser
 transformers
 accelerate
 bitsandbytes

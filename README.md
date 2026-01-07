@@ -130,8 +130,7 @@ AI Agent API
 3. **Access the API**:
    - Swagger UI: http://localhost:8000/docs
    - ReDoc: http://localhost:8000/redoc
-   - Health Check: http://localhost:8000/api/v1/health
-
+   - Health Check: http://localhost:8000/health
 ### Option 2: Local Development
 
 1. **Clone and setup**:

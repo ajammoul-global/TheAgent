@@ -4,6 +4,7 @@ Main FastAPI Application Entry Point
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from pydantic import BaseModel, Field
 import logging
 import sys
 import os
@@ -23,6 +24,7 @@ try:
     from FastApi.endpoints.preferences import router as preferences_router
     from FastApi.endpoints.context import router as context_router
     from FastApi.endpoints.healthy import router as health_router
+    from models.huggingface import HuggingFaceModel
 except ImportError as e:
     print(f"❌ Import error: {e}")
     print(f"Python path: {sys.path}")
@@ -31,6 +33,55 @@ except ImportError as e:
 # Setup logging
 setup_logging()
 logger = logging.getLogger(__name__)
+
+# ============================================================================
+# PYDANTIC MODELS
+# ============================================================================
+
+class NewsVerificationRequest(BaseModel):
+    """Request model for news verification"""
+    news: str = Field(..., description="News text to verify")
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "news": "The Earth is flat"
+            }
+        }
+
+
+class NewsVerificationResponse(BaseModel):
+    """Response model for news verification"""
+    news: str = Field(..., description="The original news text")
+    result: str = Field(..., description="Classification result (REAL or FAKE)")
+    confidence: float = Field(..., description="Confidence score (0-1)")
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "news": "The Earth is flat",
+                "result": "FAKE",
+                "confidence": 0.95
+            }
+        }
+
+# ============================================================================
+# INITIALIZE MODELS
+# ============================================================================
+
+# Initialize HuggingFace classifier for news verification
+# You can use different models. Some popular ones:
+# - "bert-base-multilingual-uncased-sentiment"
+# - "distilbert-base-uncased-finetuned-sst-2-english"
+# - "facebook/bart-large-mnli" (for zero-shot classification)
+try:
+    hf_model = HuggingFaceModel("Ali-jammoul/fake-news-detector-3b")
+    logger.info("✅ HuggingFace model loaded successfully")
+except Exception as e:
+    logger.warning(f"⚠️ Could not load HuggingFace model: {e}")
+    hf_model = None
+
+# ============================================================================
 
 
 @asynccontextmanager
@@ -101,6 +152,65 @@ async def karim():
         "service": settings.PROJECT_NAME,
         "version": settings.API_VERSION
     }
+
+
+@app.post(
+    "/api/v1/verify-news",
+    response_model=NewsVerificationResponse,
+    summary="Verify if news is real or fake",
+    tags=["news-verification"]
+)
+async def verify_news(request: NewsVerificationRequest):
+    """
+    Verify if a news article is real or fake using HuggingFace classifier.
+    
+    **Parameters:**
+    - `news` (str): The news text to verify
+    
+    **Returns:**
+    - `news`: Original news text
+    - `result`: Classification (REAL/FAKE)
+    - `confidence`: Confidence score (0-1)
+    
+    **Example:**
+    ```json
+    {
+        "news": "The Earth is flat"
+    }
+    ```
+    """
+    if not hf_model:
+        return {
+            "error": "HuggingFace model not loaded",
+            "news": request.news,
+            "result": "ERROR",
+            "confidence": 0.0
+        }
+    
+    try:
+        # Get classification from model
+        classification_result = hf_model.generate(request.news)
+        
+        # Parse the result (format: "Analysis: LABEL (Confidence: 0.XX)")
+        # Extract label and confidence
+        result_parts = classification_result.split("(Confidence: ")
+        label = result_parts[0].replace("Analysis: ", "").strip()
+        confidence = float(result_parts[1].rstrip(")"))
+        
+        return NewsVerificationResponse(
+            news=request.news,
+            result=label,
+            confidence=confidence
+        )
+    except Exception as e:
+        logger.error(f"Error verifying news: {str(e)}")
+        return {
+            "error": str(e),
+            "news": request.news,
+            "result": "ERROR",
+            "confidence": 0.0
+        }
+
 
 
 

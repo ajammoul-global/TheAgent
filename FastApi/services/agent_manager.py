@@ -44,7 +44,7 @@ class AgentManager:
         return self.model
 
     def get_agent(self, agent_type: str, session_id: Optional[str] = None):
-        # Pass self.get_model() instead of self.model
+        # Get the model using lazy loading
         current_model = self.get_model()
         
         if agent_type == "react":
@@ -52,12 +52,12 @@ class AgentManager:
             return ReActAgent(current_model, self.registry, max_steps=5)
         elif agent_type == "cot":
             from agents.cot_agent import CoTAgent
-            return CoTAgent(self.model, self.registry, num_thoughts=3)
+            return CoTAgent(current_model, self.registry, num_thoughts=3)
         
         elif agent_type == "tot":
             from agents.tot_agent import TreeOfThoughtsAgent
             return TreeOfThoughtsAgent(
-                self.model, 
+                current_model, 
                 self.registry, 
                 num_branches=3, 
                 max_depth=2
@@ -65,7 +65,7 @@ class AgentManager:
         
         elif agent_type == "scheduler":
             from agents.memory_agent import MemoryEnabledScheduler
-            return MemoryEnabledScheduler(self.model, self.registry)
+            return MemoryEnabledScheduler(current_model, self.registry)
         
         else:
             raise ValueError(f"Unknown agent type: {agent_type}")

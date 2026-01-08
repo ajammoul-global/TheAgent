@@ -53,15 +53,13 @@ class NewsVerificationRequest(BaseModel):
 class NewsVerificationResponse(BaseModel):
     """Response model for news verification"""
     news: str = Field(..., description="The original news text")
-    result: str = Field(..., description="Classification result (REAL or FAKE)")
-    confidence: float = Field(..., description="Confidence score (0-1)")
+    result: str = Field(..., description="Model verdict (REAL or FAKE)")
     
     class Config:
         schema_extra = {
             "example": {
-                "news": "The Earth is flat",
-                "result": "FAKE",
-                "confidence": 0.95
+                "news": "Breaking news: Scientists discover new element",
+                "result": "REAL"
             }
         }
 
@@ -167,20 +165,19 @@ async def karim():
 )
 async def verify_news(request: NewsVerificationRequest):
     """
-    Verify if a news article is real or fake using HuggingFace classifier.
+    Verify if a news article is real or fake using fine-tuned Llama model.
     
     **Parameters:**
     - `news` (str): The news text to verify
     
     **Returns:**
     - `news`: Original news text
-    - `result`: Classification (REAL/FAKE)
-    - `confidence`: Confidence score (0-1)
+    - `result`: Model verdict (REAL or FAKE)
     
     **Example:**
     ```json
     {
-        "news": "The Earth is flat"
+        "news": "Scientists discover new renewable energy source"
     }
     ```
     """
@@ -189,32 +186,26 @@ async def verify_news(request: NewsVerificationRequest):
         return {
             "error": "HuggingFace model failed to load",
             "news": request.news,
-            "result": "ERROR",
-            "confidence": 0.0
+            "result": "ERROR"
         }
     
     try:
-        # Get classification from model
-        classification_result = hf_model.generate(request.news)
+        # Get verdict from model
+        verdict = hf_model.generate(request.news)
         
-        # Parse the result (format: "Analysis: LABEL (Confidence: 0.XX)")
-        # Extract label and confidence
-        result_parts = classification_result.split("(Confidence: ")
-        label = result_parts[0].replace("Analysis: ", "").strip()
-        confidence = float(result_parts[1].rstrip(")"))
+        # Clean up the verdict if needed
+        verdict = verdict.strip()
         
         return NewsVerificationResponse(
             news=request.news,
-            result=label,
-            confidence=confidence
+            result=verdict
         )
     except Exception as e:
         logger.error(f"Error verifying news: {str(e)}")
         return {
             "error": str(e),
             "news": request.news,
-            "result": "ERROR",
-            "confidence": 0.0
+            "result": "ERROR"
         }
 
 

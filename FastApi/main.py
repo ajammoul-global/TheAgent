@@ -70,16 +70,21 @@ class NewsVerificationResponse(BaseModel):
 # ============================================================================
 
 # Initialize HuggingFace classifier for news verification
-# You can use different models. Some popular ones:
-# - "bert-base-multilingual-uncased-sentiment"
-# - "distilbert-base-uncased-finetuned-sst-2-english"
-# - "facebook/bart-large-mnli" (for zero-shot classification)
-try:
-    hf_model = HuggingFaceModel("Ali-jammoul/fake-news-detector-3b")
-    logger.info("✅ HuggingFace model loaded successfully")
-except Exception as e:
-    logger.warning(f"⚠️ Could not load HuggingFace model: {e}")
-    hf_model = None
+# Lazy loading: only loads when first request comes in
+hf_model = None
+
+def load_hf_model():
+    """Load HuggingFace model on first request"""
+    global hf_model
+    if hf_model is None:
+        try:
+            logger.info("Loading HuggingFace model (this may take a moment)...")
+            hf_model = HuggingFaceModel("Ali-jammoul/fake-news-detector-3b")
+            logger.info("✅ HuggingFace model loaded successfully")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not load HuggingFace model: {e}")
+            return False
+    return True
 
 # ============================================================================
 
@@ -179,9 +184,10 @@ async def verify_news(request: NewsVerificationRequest):
     }
     ```
     """
-    if not hf_model:
+    # Load model on first request
+    if not load_hf_model():
         return {
-            "error": "HuggingFace model not loaded",
+            "error": "HuggingFace model failed to load",
             "news": request.news,
             "result": "ERROR",
             "confidence": 0.0
